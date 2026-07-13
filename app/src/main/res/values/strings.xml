@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Amble</string>
+    <string name="step_tracking_channel_name">Step tracking</string>
+    <string name="step_tracking_channel_description">Shows your ongoing step count while Amble tracks in the background</string>
+    <string name="step_tracking_notification_text">%d steps today</string>
+    <string name="steps_widget_description">Today\'s steps, distance, and calories</string>
+</resources>
