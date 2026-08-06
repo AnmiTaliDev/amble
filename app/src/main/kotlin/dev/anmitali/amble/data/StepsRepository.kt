@@ -56,4 +56,20 @@ class StepsRepository(private val dao: DailyStepsDao) {
         )
         return steps
     }
+
+    suspend fun getAllDays(): List<DailyStepsEntity> = dao.getAll()
+
+    suspend fun importDay(date: LocalDate, steps: Int, source: StepSource) {
+        val dateKey = date.toString()
+        val existing = dao.getByDate(dateKey)
+        dao.upsert(
+            DailyStepsEntity(
+                date = dateKey,
+                steps = steps,
+                sensorBaseline = existing?.sensorBaseline ?: 0L,
+                lastSensorCumulative = existing?.lastSensorCumulative ?: 0L,
+                source = source.name,
+            ),
+        )
+    }
 }

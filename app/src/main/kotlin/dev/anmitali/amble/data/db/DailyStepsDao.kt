@@ -18,6 +18,9 @@ interface DailyStepsDao {
     @Query("SELECT * FROM daily_steps ORDER BY date DESC LIMIT :limit")
     fun observeRecent(limit: Int): Flow<List<DailyStepsEntity>>
 
+    @Query("SELECT * FROM daily_steps ORDER BY date ASC")
+    suspend fun getAll(): List<DailyStepsEntity>
+
     @Upsert
     suspend fun upsert(entry: DailyStepsEntity)
 }
