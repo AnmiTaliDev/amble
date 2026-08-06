@@ -111,26 +111,5 @@ fun ProfileScreen(application: AmbleApplication) {
             )
         }
 
-        Text(
-            text = "Daily goals",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            StatTile(modifier = Modifier.weight(1f), label = "Steps", value = "${currentProfile.dailyStepGoal}")
-            StatTile(
-                modifier = Modifier.weight(1f),
-                label = "Distance",
-                value = String.format(locale, "%.1f km", currentProfile.dailyDistanceGoalKm),
-            )
-            StatTile(modifier = Modifier.weight(1f), label = "Calories", value = "${currentProfile.dailyCalorieGoal} kcal")
-        }
-
-        Text(
-            text = "Edit these in Settings.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
