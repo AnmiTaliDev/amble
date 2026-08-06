@@ -4,6 +4,8 @@ package dev.anmitali.amble.ui.settings
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anmitali.amble.AmbleApplication
 import dev.anmitali.amble.BuildConfig
 import dev.anmitali.amble.R
+import dev.anmitali.amble.data.HistoryExporter
 import dev.anmitali.amble.data.db.StepSource
 import dev.anmitali.amble.data.profile.Sex
 import dev.anmitali.amble.service.StepTrackingService
@@ -52,10 +57,12 @@ import dev.anmitali.amble.ui.components.BirthDatePicker
 import dev.anmitali.amble.ui.components.RingGoalPicker
 import dev.anmitali.amble.ui.currentLocale
 import dev.anmitali.amble.ui.profile.ProfileViewModel
+import kotlinx.coroutines.launch
+import java.io.IOException
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-private enum class SettingsTab { BIODATA, GOAL, SENSORS, ABOUT }
+private enum class SettingsTab { BIODATA, GOAL, SENSORS, DATA, ABOUT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,7 +105,8 @@ fun SettingsScreen(application: AmbleApplication) {
             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Biodata") })
             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Goal") })
             Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Sensors") })
-            Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("About") })
+            Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("Data") })
+            Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("About") })
         }
 
         Column(
@@ -148,6 +156,7 @@ fun SettingsScreen(application: AmbleApplication) {
                     },
                 )
                 SettingsTab.SENSORS -> SensorsTab(application)
+                SettingsTab.DATA -> DataTab(application)
                 SettingsTab.ABOUT -> AboutTab()
             }
         }
@@ -309,6 +318,56 @@ private fun sourceLabel(source: StepSource?): String = when (source) {
     StepSource.DETECTOR -> "hardware step detector"
     StepSource.ACCELEROMETER -> "accelerometer fallback (less accurate)"
     null -> "not tracking"
+}
+
+@Composable
+private fun DataTab(application: AmbleApplication) {
+    val scope = rememberCoroutineScope()
+    var statusText by remember { mutableStateOf<String?>(null) }
+    val exporter = remember { HistoryExporter(application, application.stepsRepository) }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            statusText = try {
+                exporter.exportTo(uri)
+                "Exported."
+            } catch (e: IOException) {
+                "Export failed: ${e.message}"
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            statusText = try {
+                val count = exporter.importFrom(uri)
+                "Imported $count day(s)."
+            } catch (e: Exception) {
+                "Import failed: ${e.message}"
+            }
+        }
+    }
+
+    Text("Backup", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+    Text(
+        "Export or import your step history as a single JSON file. Nothing leaves your device unless you share the file yourself.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    AmbleButton(
+        text = "Export history",
+        onClick = { exportLauncher.launch("amble-history-${LocalDate.now()}.json") },
+    )
+    AmbleButton(
+        text = "Import history",
+        onClick = { importLauncher.launch(arrayOf("application/json")) },
+    )
+
+    statusText?.let {
+        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
