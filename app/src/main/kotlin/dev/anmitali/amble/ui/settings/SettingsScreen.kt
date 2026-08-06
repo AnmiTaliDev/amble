@@ -6,10 +6,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,7 +19,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -27,7 +28,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,10 +60,13 @@ import dev.anmitali.amble.ui.components.BirthDatePicker
 import dev.anmitali.amble.ui.components.RingGoalPicker
 import dev.anmitali.amble.ui.currentLocale
 import dev.anmitali.amble.ui.profile.ProfileViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.time.LocalDate
 import kotlin.math.roundToInt
+
+private const val AUTOSAVE_DEBOUNCE_MS = 600L
 
 private enum class SettingsTab { BIODATA, GOAL, SENSORS, DATA, ABOUT }
 
@@ -93,71 +99,79 @@ fun SettingsScreen(application: AmbleApplication) {
     val heightValid = height != null && height in 100f..250f
     val strideValid = strideText.isEmpty() || (stride != null && stride in 30f..150f)
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp),
-        )
-
-        SecondaryTabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Biodata") })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Goal") })
-            Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Sensors") })
-            Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("Data") })
-            Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("About") })
+    val currentProfile = profile
+    if (currentProfile != null && weightValid && heightValid) {
+        LaunchedEffect(weight, height, birthDate, sex) {
+            delay(AUTOSAVE_DEBOUNCE_MS)
+            viewModel.save(currentProfile.copy(weightKg = weight!!, heightCm = height!!, birthDate = birthDate, sex = sex))
         }
+    }
+    if (currentProfile != null && strideValid) {
+        LaunchedEffect(stepGoal, distanceGoalKm, calorieGoal, stride) {
+            delay(AUTOSAVE_DEBOUNCE_MS)
+            viewModel.save(
+                currentProfile.copy(
+                    dailyStepGoal = stepGoal,
+                    dailyDistanceGoalKm = distanceGoalKm,
+                    dailyCalorieGoal = calorieGoal,
+                    strideLengthCm = stride,
+                ),
+            )
+        }
+    }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-                .padding(20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            when (SettingsTab.entries[tab]) {
-                SettingsTab.BIODATA -> BiodataTab(
-                    weightText = weightText,
-                    onWeightChange = { weightText = it },
-                    weightValid = weightValid,
-                    heightText = heightText,
-                    onHeightChange = { heightText = it },
-                    heightValid = heightValid,
-                    birthDate = birthDate,
-                    onBirthDateChange = { birthDateEpochDay = it.toEpochDay() },
-                    sex = sex,
-                    onSexChange = { sexName = it.name },
-                    onSave = {
-                        viewModel.save(profile!!.copy(weightKg = weight!!, heightCm = height!!, birthDate = birthDate, sex = sex))
-                    },
-                    canSave = weightValid && heightValid,
-                )
-                SettingsTab.GOAL -> GoalTab(
-                    stepGoal = stepGoal,
-                    onStepGoalChange = { stepGoal = it },
-                    distanceGoalKm = distanceGoalKm,
-                    onDistanceGoalChange = { distanceGoalKm = it },
-                    calorieGoal = calorieGoal,
-                    onCalorieGoalChange = { calorieGoal = it },
-                    strideText = strideText,
-                    onStrideChange = { strideText = it },
-                    strideValid = strideValid,
-                    onSave = {
-                        viewModel.save(
-                            profile!!.copy(
-                                dailyStepGoal = stepGoal,
-                                dailyDistanceGoalKm = distanceGoalKm,
-                                dailyCalorieGoal = calorieGoal,
-                                strideLengthCm = stride,
-                            ),
-                        )
-                    },
-                )
-                SettingsTab.SENSORS -> SensorsTab(application)
-                SettingsTab.DATA -> DataTab(application)
-                SettingsTab.ABOUT -> AboutTab()
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text("Settings") }, windowInsets = WindowInsets(0, 0, 0, 0))
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    ) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            SecondaryScrollableTabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Biodata") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Goal") })
+                Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Sensors") })
+                Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("Data") })
+                Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("About") })
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                when (SettingsTab.entries[tab]) {
+                    SettingsTab.BIODATA -> BiodataTab(
+                        weightText = weightText,
+                        onWeightChange = { weightText = it },
+                        weightValid = weightValid,
+                        heightText = heightText,
+                        onHeightChange = { heightText = it },
+                        heightValid = heightValid,
+                        birthDate = birthDate,
+                        onBirthDateChange = { birthDateEpochDay = it.toEpochDay() },
+                        sex = sex,
+                        onSexChange = { sexName = it.name },
+                    )
+                    SettingsTab.GOAL -> GoalTab(
+                        stepGoal = stepGoal,
+                        onStepGoalChange = { stepGoal = it },
+                        distanceGoalKm = distanceGoalKm,
+                        onDistanceGoalChange = { distanceGoalKm = it },
+                        calorieGoal = calorieGoal,
+                        onCalorieGoalChange = { calorieGoal = it },
+                        strideText = strideText,
+                        onStrideChange = { strideText = it },
+                        strideValid = strideValid,
+                    )
+                    SettingsTab.SENSORS -> SensorsTab(application)
+                    SettingsTab.DATA -> DataTab(application)
+                    SettingsTab.ABOUT -> AboutTab()
+                }
             }
         }
     }
@@ -176,8 +190,6 @@ private fun BiodataTab(
     onBirthDateChange: (LocalDate) -> Unit,
     sex: Sex,
     onSexChange: (Sex) -> Unit,
-    onSave: () -> Unit,
-    canSave: Boolean,
 ) {
     OutlinedTextField(
         value = weightText,
@@ -210,8 +222,6 @@ private fun BiodataTab(
             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
         ) { Text("Female") }
     }
-
-    AmbleButton(text = "Save", enabled = canSave, onClick = onSave)
 }
 
 @Composable
@@ -225,7 +235,6 @@ private fun GoalTab(
     strideText: String,
     onStrideChange: (String) -> Unit,
     strideValid: Boolean,
-    onSave: () -> Unit,
 ) {
     Text("Daily step goal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -277,8 +286,6 @@ private fun GoalTab(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = Modifier.fillMaxWidth(),
     )
-
-    AmbleButton(text = "Save", enabled = strideValid, onClick = onSave)
 }
 
 @Composable
