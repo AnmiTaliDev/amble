@@ -4,8 +4,16 @@ package dev.anmitali.amble.ui.onboarding
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,17 +22,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -35,25 +49,28 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import dev.anmitali.amble.AmbleApplication
+import dev.anmitali.amble.R
 import dev.anmitali.amble.data.profile.Sex
 import dev.anmitali.amble.data.profile.UserProfile
 import dev.anmitali.amble.service.StepTrackingService
 import dev.anmitali.amble.ui.ambleViewModel
-import dev.anmitali.amble.ui.components.AmbleButton
 import dev.anmitali.amble.ui.components.BirthDatePicker
-import dev.anmitali.amble.ui.components.RingGoalPicker
+import dev.anmitali.amble.ui.components.ConnectedChoiceRow
+import dev.anmitali.amble.ui.components.GoalSlider
 import dev.anmitali.amble.ui.profile.ProfileViewModel
-import dev.anmitali.amble.ui.theme.AccentColor
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
 private const val TOTAL_STEPS = 5
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun OnboardingScreen(application: AmbleApplication, onFinished: () -> Unit) {
     val viewModel = ambleViewModel { ProfileViewModel(application.profileStore) }
@@ -96,143 +113,164 @@ fun OnboardingScreen(application: AmbleApplication, onFinished: () -> Unit) {
         if (allGranted) finishOnboarding() else permissionLauncher.launch(permissions)
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        StepDots(current = step, total = TOTAL_STEPS)
+    BackHandler(enabled = step > 0) { step-- }
 
-        Column(modifier = Modifier.fillMaxSize().weight(1f).padding(24.dp)) {
-            when (step) {
-                0 -> WelcomeStep()
-                1 -> WeightStep(weightKg) { weightKg = it }
-                2 -> HeightStep(heightCm) { heightCm = it }
-                3 -> BirthDateAndSexStep(birthDate, { birthDateEpochDay = it.toEpochDay() }, sex) { sexName = it.name }
-                4 -> GoalStep(stepGoal) { stepGoal = it }
+    val progress by animateFloatAsState(
+        targetValue = (step + 1) / TOTAL_STEPS.toFloat(),
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+    )
+    val isLastStep = step == TOTAL_STEPS - 1
+
+    Scaffold(
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, start = 4.dp, end = 24.dp)
+                    .heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    if (step > 0) {
+                        IconButton(onClick = { step-- }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                }
+                Spacer(Modifier.size(8.dp))
+                LinearWavyProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f))
+            }
+        },
+        bottomBar = {
+            Button(
+                onClick = { if (isLastStep) requestPermissionsAndFinish() else step++ },
+                shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+                contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .heightIn(min = ButtonDefaults.MediumContainerHeight),
+            ) {
+                Text(
+                    text = if (isLastStep) "Grant permissions and start" else "Continue",
+                    style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight),
+                )
+            }
+        },
+    ) { innerPadding ->
+        val slideSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+        val fadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+        AnimatedContent(
+            targetState = step,
+            transitionSpec = {
+                val direction = if (targetState > initialState) 1 else -1
+                (slideInHorizontally(slideSpec) { width -> direction * width / 4 } + fadeIn(fadeSpec)) togetherWith
+                    (slideOutHorizontally(slideSpec) { width -> -direction * width / 4 } + fadeOut(fadeSpec))
+            },
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            label = "onboardingStep",
+        ) { currentStep ->
+            Box(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp), contentAlignment = Alignment.Center) {
+                Column(modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
+                    when (currentStep) {
+                        0 -> WelcomeStep()
+                        1 -> WeightStep(weightKg) { weightKg = it }
+                        2 -> HeightStep(heightCm) { heightCm = it }
+                        3 -> BirthDateAndSexStep(birthDate, { birthDateEpochDay = it.toEpochDay() }, sex) { sexName = it.name }
+                        4 -> GoalStep(stepGoal) { stepGoal = it }
+                    }
+                }
             }
         }
-
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
-            AmbleButton(
-                text = if (step == TOTAL_STEPS - 1) "Grant permissions and start" else "Continue",
-                onClick = { if (step == TOTAL_STEPS - 1) requestPermissionsAndFinish() else step++ },
-                modifier = Modifier.weight(1f),
-            )
-        }
     }
 }
 
 @Composable
-private fun StepDots(current: Int, total: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        repeat(total) { index ->
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .size(8.dp)
-                    .background(
-                        color = if (index == current) AccentColor else MaterialTheme.colorScheme.surfaceVariant,
-                        shape = CircleShape,
-                    ),
-            )
-        }
+private fun StepTitle(title: String, subtitle: String? = null) {
+    Text(title, style = MaterialTheme.typography.headlineLargeEmphasized, color = MaterialTheme.colorScheme.onSurface)
+    if (subtitle != null) {
+        Spacer(Modifier.size(8.dp))
+        Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+    Spacer(Modifier.size(32.dp))
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun WelcomeStep() {
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-        Text("Welcome to Amble", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "A few quick questions to estimate your distance and calories. Everything stays on your device.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Box(
+        modifier = Modifier
+            .size(160.dp)
+            .clip(MaterialShapes.SoftBurst.toShape())
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_notification_steps),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(80.dp),
         )
     }
+    Spacer(Modifier.size(40.dp))
+    Text("Welcome to Amble", style = MaterialTheme.typography.displaySmallEmphasized, color = MaterialTheme.colorScheme.onSurface)
+    Spacer(Modifier.size(12.dp))
+    Text(
+        "A few quick questions to estimate your distance and calories. Everything stays on your device.",
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
 private fun WeightStep(weightKg: Float, onChange: (Float) -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text("What's your weight?", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.height(40.dp))
-        Text("${weightKg.roundToInt()} kg", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.height(24.dp))
-        Slider(value = weightKg, onValueChange = onChange, valueRange = 30f..200f, modifier = Modifier.fillMaxWidth())
-    }
+    StepTitle("What's your weight?")
+    GoalSlider(
+        value = weightKg,
+        onValueChange = onChange,
+        valueRange = 30f..200f,
+        step = 1f,
+        valueText = "${weightKg.roundToInt()}",
+        unit = "kg",
+    )
 }
 
 @Composable
 private fun HeightStep(heightCm: Float, onChange: (Float) -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text("What's your height?", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.height(40.dp))
-        Text("${heightCm.roundToInt()} cm", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.height(24.dp))
-        Slider(value = heightCm, onValueChange = onChange, valueRange = 100f..220f, modifier = Modifier.fillMaxWidth())
-    }
+    StepTitle("What's your height?")
+    GoalSlider(
+        value = heightCm,
+        onValueChange = onChange,
+        valueRange = 100f..220f,
+        step = 1f,
+        valueText = "${heightCm.roundToInt()}",
+        unit = "cm",
+    )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BirthDateAndSexStep(birthDate: LocalDate, onBirthDateChange: (LocalDate) -> Unit, sex: Sex, onSexChange: (Sex) -> Unit) {
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-        Text("Birth date and sex", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-        Text(
-            "Used to estimate calories burned. This never leaves your device.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(24.dp))
-
+    StepTitle("Birth date and sex", "Used to estimate calories burned. This never leaves your device.")
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BirthDatePicker(birthDate, onBirthDateChange)
-
-        Spacer(Modifier.height(16.dp))
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = sex == Sex.MALE,
-                onClick = { onSexChange(Sex.MALE) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            ) { Text("Male") }
-            SegmentedButton(
-                selected = sex == Sex.FEMALE,
-                onClick = { onSexChange(Sex.FEMALE) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            ) { Text("Female") }
-        }
+        ConnectedChoiceRow(
+            options = Sex.entries,
+            selected = sex,
+            onSelect = onSexChange,
+            label = { it.name.lowercase().replaceFirstChar(Char::uppercase) },
+        )
     }
 }
 
 @Composable
 private fun GoalStep(goal: Int, onGoalChange: (Int) -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text("Pick a daily step goal", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-        Text(
-            "Drag around the ring. You can change this later in Settings.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(24.dp))
-        RingGoalPicker(
-            value = goal.toFloat(),
-            onValueChange = { onGoalChange(it.roundToInt()) },
-            valueRange = 2_000f..20_000f,
-            step = 500f,
-            valueText = "$goal",
-            label = "steps / day",
-        )
-    }
+    StepTitle("Pick a daily step goal", "You can change this later in Settings.")
+    GoalSlider(
+        value = goal.toFloat(),
+        onValueChange = { onGoalChange(it.roundToInt()) },
+        valueRange = 2_000f..20_000f,
+        step = 500f,
+        valueText = "$goal",
+        unit = "steps / day",
+    )
 }

@@ -2,16 +2,13 @@
 // SPDX-FileCopyrightText: 2026 AnmiTaliDev
 package dev.anmitali.amble.ui
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -40,34 +37,34 @@ fun AmbleApp(application: AmbleApplication) {
     }
 
     val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
 
-    Scaffold(
-        bottomBar = {
-            val backStackEntry by navController.currentBackStackEntryAsState()
-            val currentRoute = backStackEntry?.destination?.route
-            NavigationBar {
-                AmbleDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        selected = currentRoute == destination.route,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(destination.icon, contentDescription = destination.label) },
-                        label = { Text(destination.label) },
-                    )
-                }
+    NavigationSuiteScaffold(
+        navigationItems = {
+            AmbleDestination.entries.forEach { destination ->
+                val selected = currentRoute == destination.route
+                NavigationSuiteItem(
+                    selected = selected,
+                    onClick = {
+                        navController.navigate(destination.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = if (selected) destination.selectedIcon else destination.unselectedIcon,
+                            contentDescription = null,
+                        )
+                    },
+                    label = { Text(destination.label) },
+                )
             }
         },
-    ) { padding ->
-        NavHost(
-            navController = navController,
-            startDestination = AmbleDestination.HOME.route,
-            modifier = Modifier.padding(padding),
-        ) {
+    ) {
+        NavHost(navController = navController, startDestination = AmbleDestination.HOME.route) {
             composable(AmbleDestination.HOME.route) { HomeScreen(application) }
             composable(AmbleDestination.HISTORY.route) { HistoryScreen(application) }
             composable(AmbleDestination.PROFILE.route) { ProfileScreen(application) }

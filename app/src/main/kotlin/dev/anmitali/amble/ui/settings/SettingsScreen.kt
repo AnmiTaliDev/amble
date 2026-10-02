@@ -7,24 +7,29 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SecondaryScrollableTabRow
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -55,9 +60,9 @@ import dev.anmitali.amble.data.db.StepSource
 import dev.anmitali.amble.data.profile.Sex
 import dev.anmitali.amble.service.StepTrackingService
 import dev.anmitali.amble.ui.ambleViewModel
-import dev.anmitali.amble.ui.components.AmbleButton
 import dev.anmitali.amble.ui.components.BirthDatePicker
-import dev.anmitali.amble.ui.components.RingGoalPicker
+import dev.anmitali.amble.ui.components.ConnectedChoiceRow
+import dev.anmitali.amble.ui.components.GoalSlider
 import dev.anmitali.amble.ui.currentLocale
 import dev.anmitali.amble.ui.profile.ProfileViewModel
 import kotlinx.coroutines.delay
@@ -68,7 +73,13 @@ import kotlin.math.roundToInt
 
 private const val AUTOSAVE_DEBOUNCE_MS = 600L
 
-private enum class SettingsTab { BIODATA, GOAL, SENSORS, DATA, ABOUT }
+private enum class SettingsTab(val label: String) {
+    BIODATA("Biodata"),
+    GOAL("Goal"),
+    SENSORS("Sensors"),
+    DATA("Data"),
+    ABOUT("About"),
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,61 +131,70 @@ fun SettingsScreen(application: AmbleApplication) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Settings") }, windowInsets = WindowInsets(0, 0, 0, 0))
-        },
-        containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-    ) { innerPadding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            SecondaryScrollableTabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Biodata") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Goal") })
-                Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Sensors") })
-                Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("Data") })
-                Tab(selected = tab == 4, onClick = { tab = 4 }, text = { Text("About") })
+            PrimaryScrollableTabRow(selectedTabIndex = tab, edgePadding = 16.dp) {
+                SettingsTab.entries.forEachIndexed { index, settingsTab ->
+                    Tab(selected = tab == index, onClick = { tab = index }, text = { Text(settingsTab.label) })
+                }
             }
 
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
-                    .padding(20.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentAlignment = Alignment.TopCenter,
             ) {
-                when (SettingsTab.entries[tab]) {
-                    SettingsTab.BIODATA -> BiodataTab(
-                        weightText = weightText,
-                        onWeightChange = { weightText = it },
-                        weightValid = weightValid,
-                        heightText = heightText,
-                        onHeightChange = { heightText = it },
-                        heightValid = heightValid,
-                        birthDate = birthDate,
-                        onBirthDateChange = { birthDateEpochDay = it.toEpochDay() },
-                        sex = sex,
-                        onSexChange = { sexName = it.name },
-                    )
-                    SettingsTab.GOAL -> GoalTab(
-                        stepGoal = stepGoal,
-                        onStepGoalChange = { stepGoal = it },
-                        distanceGoalKm = distanceGoalKm,
-                        onDistanceGoalChange = { distanceGoalKm = it },
-                        calorieGoal = calorieGoal,
-                        onCalorieGoalChange = { calorieGoal = it },
-                        strideText = strideText,
-                        onStrideChange = { strideText = it },
-                        strideValid = strideValid,
-                    )
-                    SettingsTab.SENSORS -> SensorsTab(application)
-                    SettingsTab.DATA -> DataTab(application)
-                    SettingsTab.ABOUT -> AboutTab()
+                Column(
+                    modifier = Modifier
+                        .widthIn(max = 600.dp)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    when (SettingsTab.entries[tab]) {
+                        SettingsTab.BIODATA -> BiodataTab(
+                            weightText = weightText,
+                            onWeightChange = { weightText = it },
+                            weightValid = weightValid,
+                            heightText = heightText,
+                            onHeightChange = { heightText = it },
+                            heightValid = heightValid,
+                            birthDate = birthDate,
+                            onBirthDateChange = { birthDateEpochDay = it.toEpochDay() },
+                            sex = sex,
+                            onSexChange = { sexName = it.name },
+                        )
+                        SettingsTab.GOAL -> GoalTab(
+                            stepGoal = stepGoal,
+                            onStepGoalChange = { stepGoal = it },
+                            distanceGoalKm = distanceGoalKm,
+                            onDistanceGoalChange = { distanceGoalKm = it },
+                            calorieGoal = calorieGoal,
+                            onCalorieGoalChange = { calorieGoal = it },
+                            strideText = strideText,
+                            onStrideChange = { strideText = it },
+                            strideValid = strideValid,
+                        )
+                        SettingsTab.SENSORS -> SensorsTab(application)
+                        SettingsTab.DATA -> DataTab(application)
+                        SettingsTab.ABOUT -> AboutTab()
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -191,37 +211,38 @@ private fun BiodataTab(
     sex: Sex,
     onSexChange: (Sex) -> Unit,
 ) {
+    SectionHeader("Body")
     OutlinedTextField(
         value = weightText,
         onValueChange = onWeightChange,
-        label = { Text("Weight (kg)") },
+        label = { Text("Weight") },
+        suffix = { Text("kg") },
         isError = weightText.isNotEmpty() && !weightValid,
+        supportingText = { Text("20 to 300 kg") },
+        singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
         value = heightText,
         onValueChange = onHeightChange,
-        label = { Text("Height (cm)") },
+        label = { Text("Height") },
+        suffix = { Text("cm") },
         isError = heightText.isNotEmpty() && !heightValid,
+        supportingText = { Text("100 to 250 cm") },
+        singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = Modifier.fillMaxWidth(),
     )
 
+    SectionHeader("Personal")
     BirthDatePicker(birthDate, onBirthDateChange)
-
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        SegmentedButton(
-            selected = sex == Sex.MALE,
-            onClick = { onSexChange(Sex.MALE) },
-            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-        ) { Text("Male") }
-        SegmentedButton(
-            selected = sex == Sex.FEMALE,
-            onClick = { onSexChange(Sex.FEMALE) },
-            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-        ) { Text("Female") }
-    }
+    ConnectedChoiceRow(
+        options = Sex.entries,
+        selected = sex,
+        onSelect = onSexChange,
+        label = { it.name.lowercase().replaceFirstChar(Char::uppercase) },
+    )
 }
 
 @Composable
@@ -236,88 +257,95 @@ private fun GoalTab(
     onStrideChange: (String) -> Unit,
     strideValid: Boolean,
 ) {
-    Text("Daily step goal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-        RingGoalPicker(
+    SectionHeader("Daily steps")
+    GoalCard {
+        GoalSlider(
             value = stepGoal.toFloat(),
             onValueChange = { onStepGoalChange(it.roundToInt()) },
             valueRange = 2_000f..20_000f,
             step = 500f,
             valueText = "$stepGoal",
-            label = "steps / day",
-            diameter = 160.dp,
-            strokeWidth = 14.dp,
+            unit = "steps",
         )
     }
 
-    Text("Daily distance goal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-        RingGoalPicker(
+    SectionHeader("Daily distance")
+    GoalCard {
+        GoalSlider(
             value = distanceGoalKm,
             onValueChange = onDistanceGoalChange,
             valueRange = 1f..20f,
             step = 0.5f,
             valueText = String.format(currentLocale(), "%.1f", distanceGoalKm),
-            label = "km / day",
-            diameter = 160.dp,
-            strokeWidth = 14.dp,
+            unit = "km",
         )
     }
 
-    Text("Daily calorie goal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-        RingGoalPicker(
+    SectionHeader("Daily calories")
+    GoalCard {
+        GoalSlider(
             value = calorieGoal.toFloat(),
             onValueChange = { onCalorieGoalChange(it.roundToInt()) },
             valueRange = 100f..1_500f,
             step = 50f,
             valueText = "$calorieGoal",
-            label = "kcal / day",
-            diameter = 160.dp,
-            strokeWidth = 14.dp,
+            unit = "kcal",
         )
     }
 
+    SectionHeader("Stride")
     OutlinedTextField(
         value = strideText,
         onValueChange = onStrideChange,
-        label = { Text("Stride length override (cm, optional)") },
+        label = { Text("Stride length override") },
+        suffix = { Text("cm") },
         isError = !strideValid,
+        supportingText = { Text("Optional, 30 to 150 cm. Leave empty to estimate from height.") },
+        singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = Modifier.fillMaxWidth(),
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun GoalCard(content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.largeIncreased,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Box(modifier = Modifier.padding(20.dp)) { content() }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SensorsTab(application: AmbleApplication) {
     val isTracking by StepTrackingService.isRunning.collectAsStateWithLifecycle()
     val activeSource by StepTrackingService.activeSource.collectAsStateWithLifecycle()
 
-    Text("Background tracking", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "Track steps in the background",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Switch(
-            checked = isTracking,
-            onCheckedChange = {
-                if (it) StepTrackingService.start(application) else StepTrackingService.stop(application)
-            },
-        )
+    fun setTracking(enabled: Boolean) {
+        if (enabled) StepTrackingService.start(application) else StepTrackingService.stop(application)
     }
 
-    Text("Diagnostics", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-    Text(
-        text = "Step source: " + sourceLabel(activeSource),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    SectionHeader("Background tracking")
+    SegmentedListItem(
+        onClick = { setTracking(!isTracking) },
+        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+        supportingContent = { Text("Keeps counting while the app is closed") },
+        trailingContent = { Switch(checked = isTracking, onCheckedChange = ::setTracking) },
+    ) {
+        Text("Track steps in the background")
+    }
+
+    SectionHeader("Diagnostics")
+    SegmentedListItem(
+        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+        overlineContent = { Text("Step source") },
+    ) {
+        Text(sourceLabel(activeSource).replaceFirstChar(Char::uppercase))
+    }
 }
 
 private fun sourceLabel(source: StepSource?): String = when (source) {
@@ -327,6 +355,7 @@ private fun sourceLabel(source: StepSource?): String = when (source) {
     null -> "not tracking"
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DataTab(application: AmbleApplication) {
     val scope = rememberCoroutineScope()
@@ -356,72 +385,88 @@ private fun DataTab(application: AmbleApplication) {
         }
     }
 
-    Text("Backup", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
+    SectionHeader("Backup")
     Text(
         "Export or import your step history as a single JSON file. Nothing leaves your device unless you share the file yourself.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp),
     )
 
-    AmbleButton(
-        text = "Export history",
+    Button(
         onClick = { exportLauncher.launch("amble-history-${LocalDate.now()}.json") },
-    )
-    AmbleButton(
-        text = "Import history",
+        shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+        contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+        modifier = Modifier.fillMaxWidth().heightIn(min = ButtonDefaults.MediumContainerHeight),
+    ) {
+        Text("Export history", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
+    }
+    FilledTonalButton(
         onClick = { importLauncher.launch(arrayOf("application/json")) },
-    )
+        shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+        contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+        modifier = Modifier.fillMaxWidth().heightIn(min = ButtonDefaults.MediumContainerHeight),
+    ) {
+        Text("Import history", style = ButtonDefaults.textStyleFor(ButtonDefaults.MediumContainerHeight))
+    }
 
     statusText?.let {
-        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            it,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AboutTab() {
     val context = LocalContext.current
 
-    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
-    Text(
-        "Version ${BuildConfig.VERSION_NAME}",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Text(
-        "A small, offline step tracker. No accounts, no ads, no analytics, no network access.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Surface(
-        onClick = {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.gnu.org/licenses/gpl-3.0.html")))
-        },
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            "Licensed under the GNU General Public License v3.0",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(16.dp),
-        )
+    fun openUrl(url: String) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 
-    Text("Open source libraries", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OSS_LIBRARIES.forEach { library ->
-            Surface(
-                onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(library.url))) },
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth(),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMediumEmphasized)
+            Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.labelLarge)
+            Text(
+                "A small, offline step tracker. No accounts, no ads, no analytics, no network access.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+
+    SectionHeader("License")
+    SegmentedListItem(
+        onClick = { openUrl("https://www.gnu.org/licenses/gpl-3.0.html") },
+        shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+        supportingContent = { Text("GNU General Public License v3.0") },
+    ) {
+        Text("Licensed under GPL-3.0")
+    }
+
+    SectionHeader("Open source libraries")
+    Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+        OSS_LIBRARIES.forEachIndexed { index, library ->
+            SegmentedListItem(
+                onClick = { openUrl(library.url) },
+                shapes = ListItemDefaults.segmentedShapes(index = index, count = OSS_LIBRARIES.size),
+                overlineContent = { Text(library.license) },
+                supportingContent = { Text(library.copyright) },
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(library.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                    Text(library.license, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(library.copyright, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Text(library.name)
             }
         }
     }

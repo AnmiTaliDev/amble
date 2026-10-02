@@ -2,14 +2,18 @@
 // SPDX-FileCopyrightText: 2026 AnmiTaliDev
 package dev.anmitali.amble.ui.components
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItemShapes
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.SelectableDates
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -19,32 +23,33 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun BirthDatePicker(birthDate: LocalDate, onBirthDateChange: (LocalDate) -> Unit, modifier: Modifier = Modifier) {
+fun BirthDatePicker(
+    birthDate: LocalDate,
+    onBirthDateChange: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
+    shapes: ListItemShapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
+) {
     var showPicker by rememberSaveable { mutableStateOf(false) }
     val today = LocalDate.now()
     val minBirthDate = today.minusYears(120)
     val maxBirthDate = today.minusYears(5)
 
-    Surface(
+    SegmentedListItem(
         onClick = { showPicker = true },
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        modifier = modifier.fillMaxWidth(),
+        shapes = shapes,
+        modifier = modifier,
+        leadingContent = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+        trailingContent = { Icon(Icons.Filled.Edit, contentDescription = "Change birth date") },
+        overlineContent = { Text("Birth date") },
     ) {
-        Text(
-            text = birthDate.format(DateTimeFormatter.ofPattern("d MMMM yyyy")),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(16.dp),
-        )
+        Text(birthDate.format(DateTimeFormatter.ofPattern("d MMMM yyyy")))
     }
 
     if (showPicker) {
